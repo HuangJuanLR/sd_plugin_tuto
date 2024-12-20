@@ -16,6 +16,12 @@ class Window(QtWidgets.QDialog):
         self.pkg_mgr = pkg_mgr
 
         self.window = QtWidgets.QDialog(parent=parent)
+        # QVBoxLayout QHBoxLayout QGridLayout
+        layout = QtWidgets.QVBoxLayout()
+        self.testLineEdit = QtWidgets.QLineEdit("Test")
+        layout.addWidget(self.testLineEdit)
+
+        self.window.setLayout(layout)
 
     def show(self):
         self.window.show()
