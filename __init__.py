@@ -6,7 +6,19 @@ from sd.api.sdbasetypes import float2, float4
 from sd.api.sdvaluefloat import SDValueFloat
 from sd.api.sdvaluefloat4 import SDValueFloat4
 
-from lib import Window
+# from lib import Window
+
+class Window(QtWidgets.QDialog):
+    def __init__(self, parent, pkg_mgr, ui_mgr):
+        super(Window, self).__init__(parent)
+
+        self.ui_mgr = ui_mgr
+        self.pkg_mgr = pkg_mgr
+
+        self.window = QtWidgets.QDialog(parent=parent)
+
+    def show(self):
+        self.window.show()
 
 context = sd.getContext()
 app = context.getSDApplication()
@@ -17,7 +29,7 @@ ui_mgr = app.getQtForPythonUIMgr()
 graph = ui_mgr.getCurrentGraph()
 main_window = ui_mgr.getMainWindow()
 
-win = Window.Window(main_window, pkg_mgr, ui_mgr)
+win = Window(main_window, pkg_mgr, ui_mgr)
 
 def show_plugin():
     win.show()
