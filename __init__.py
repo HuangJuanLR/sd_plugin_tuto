@@ -1,5 +1,6 @@
 import os
 import sd
+from pathlib import Path
 from PySide6 import QtCore, QtWidgets, QtGui, QtUiTools
 from sd.api.sdproperty import SDPropertyCategory
 from sd.api.sdbasetypes import float2, float4
@@ -9,22 +10,22 @@ from sd.api.sdvaluefloat4 import SDValueFloat4
 # from lib import Window
 
 class Window(QtWidgets.QDialog):
-    def __init__(self, parent, pkg_mgr, ui_mgr):
+    def __init__(self, ui_file, parent, pkg_mgr, ui_mgr):
         super(Window, self).__init__(parent)
 
         self.ui_mgr = ui_mgr
         self.pkg_mgr = pkg_mgr
 
-        self.window = QtWidgets.QDialog(parent=parent)
-        # QVBoxLayout QHBoxLayout QGridLayout
-        layout = QtWidgets.QVBoxLayout()
-        self.testLineEdit = QtWidgets.QLineEdit("Test")
-        layout.addWidget(self.testLineEdit)
-
-        self.window.setLayout(layout)
+        self.ui_file = QtCore.QFile(ui_file)
+        self.ui_file.open(QtCore.QFile.ReadOnly)
+        loader = QtUiTools.QUiLoader()
+        self.window = loader.load(ui_file, parent)
+        self.ui_file.close()
 
     def show(self):
         self.window.show()
+
+ui_file = Path(__file__).resolve().parent / "batch_process_dialog.ui"
 
 context = sd.getContext()
 app = context.getSDApplication()
@@ -35,7 +36,7 @@ ui_mgr = app.getQtForPythonUIMgr()
 graph = ui_mgr.getCurrentGraph()
 main_window = ui_mgr.getMainWindow()
 
-win = Window(main_window, pkg_mgr, ui_mgr)
+win = Window(ui_file, main_window, pkg_mgr, ui_mgr)
 
 def show_plugin():
     win.show()
