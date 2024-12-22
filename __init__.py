@@ -23,6 +23,14 @@ class Window(QtWidgets.QDialog):
         self.pattern = "$(graph)_$(identifier)"
         self.resource_folder_name = "BakedTextures"
 
+        # set temp path for input/output directory
+        self.graph = ui_mgr.getCurrentGraph()
+        if self.graph is not None:
+            cur_pkg = self.graph.getPackage()
+            temp_path = str(Path(cur_pkg.getFilePath()).resolve().parent)
+            self.input_directory = temp_path
+            self.output_directory = temp_path
+
         self.ui_file = QtCore.QFile(ui_file)
         self.ui_file.open(QtCore.QFile.ReadOnly)
         loader = QtUiTools.QUiLoader()
@@ -43,8 +51,31 @@ class Window(QtWidgets.QDialog):
         self.chooseButton = self.window.findChild(QtWidgets.QPushButton, "chooseProcessorButton")
         self.processButton = self.window.findChild(QtWidgets.QPushButton, "processButton")
 
+        self.resourceFolderLineEdit.setText(self.resource_folder_name)
+        self.inputDirectoryLineEdit.setText(self.input_directory)
+        self.outputDirectoryLineEdit.setText(self.output_directory)
+        self.patternLineEdit.setText(self.pattern)
+
+        self.patternLineEdit.textChanged.connect(self.on_pattern_changed)
+
+        self.update_preview()
+
     def show(self):
         self.window.show()
+
+    def on_pattern_changed(self):
+        self.pattern =  self.patternLineEdit.text()
+        self.update_preview()
+
+    def update_preview(self):
+        pattern = self.pattern
+        mapping = dict()
+        mapping['$(graph)'] = self.graph.getIdentifier()
+        mapping['$(identifier)'] = "basecolor"
+        for k, v in mapping.items():
+            pattern = pattern.replace(k, v)
+        preview_text = f"Preview: {pattern}_0"
+        self.previewLabel.setText(preview_text)
 
 ui_file = Path(__file__).resolve().parent / "batch_process_dialog.ui"
 
