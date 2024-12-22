@@ -16,11 +16,32 @@ class Window(QtWidgets.QDialog):
         self.ui_mgr = ui_mgr
         self.pkg_mgr = pkg_mgr
 
+        self.processor_node = None
+        self.processor_name = None
+        self.input_directory = None
+        self.output_directory = None
+        self.pattern = "$(graph)_$(identifier)"
+        self.resource_folder_name = "BakedTextures"
+
         self.ui_file = QtCore.QFile(ui_file)
         self.ui_file.open(QtCore.QFile.ReadOnly)
         loader = QtUiTools.QUiLoader()
         self.window = loader.load(ui_file, parent)
         self.ui_file.close()
+
+        # link variables to QtWidgets
+        self.processorNameLineEdit = self.window.findChild(QtWidgets.QLineEdit, "processorNameLineEdit")
+        self.resourceFolderLineEdit = self.window.findChild(QtWidgets.QLineEdit, "resourceFolderLineEdit")
+        self.inputDirectoryLineEdit = self.window.findChild(QtWidgets.QLineEdit, "inputDir")
+        self.outputDirectoryLineEdit = self.window.findChild(QtWidgets.QLineEdit, "outputDir")
+        self.patternLineEdit = self.window.findChild(QtWidgets.QLineEdit, "patternLineEdit")
+        self.previewLabel = self.window.findChild(QtWidgets.QLabel, "previewLabel")
+
+        self.browseProcessorUrlButton = self.window.findChild(QtWidgets.QPushButton, "browseProcessorUrlButton")
+        self.browseInputButton = self.window.findChild(QtWidgets.QPushButton, "browseInputButton")
+        self.browseOutputButton = self.window.findChild(QtWidgets.QPushButton, "browseOutputButton")
+        self.chooseButton = self.window.findChild(QtWidgets.QPushButton, "chooseProcessorButton")
+        self.processButton = self.window.findChild(QtWidgets.QPushButton, "processButton")
 
     def show(self):
         self.window.show()
