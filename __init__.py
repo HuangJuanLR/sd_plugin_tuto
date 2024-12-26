@@ -56,12 +56,48 @@ class Window(QtWidgets.QDialog):
         self.outputDirectoryLineEdit.setText(self.output_directory)
         self.patternLineEdit.setText(self.pattern)
 
+        self.resourceFolderLineEdit.editingFinished.connect(self.on_resource_folder_changed)
         self.patternLineEdit.textChanged.connect(self.on_pattern_changed)
+
+        self.browseInputButton.clicked.connect(self.browse_input_directory)
+        self.browseOutputButton.clicked.connect(self.browse_output_directory)
 
         self.update_preview()
 
     def show(self):
         self.window.show()
+
+    def browse_input_directory(self):
+        path = QtWidgets.QFileDialog.getExistingDirectory(parent = self.window,
+                                                          caption="Select Input Directory",
+                                                          dir=self.input_directory)
+        if path:
+            self.on_input_changed(path)
+
+    def browse_output_directory(self):
+        path = QtWidgets.QFileDialog.getExistingDirectory(parent=self.window,
+                                                          caption="Select Output Directory",
+                                                          dir=self.output_directory)
+        if path:
+            self.on_output_changed(path)
+
+
+    def on_input_changed(self, path=None):
+        if not path:
+            self.input_directory = self.inputDirectoryLineEdit.text()
+        else:
+            self.input_directory = path
+            self.inputDirectoryLineEdit.setText(path)
+
+    def on_output_changed(self, path=None):
+        if not path:
+            self.output_directory = self.outputDirectoryLineEdit.text()
+        else:
+            self.output_directory = path
+            self.outputDirectoryLineEdit.setText(path)
+
+    def on_resource_folder_changed(self):
+        self.resource_folder_name = self.resourceFolderLineEdit.text()
 
     def on_pattern_changed(self):
         self.pattern =  self.patternLineEdit.text()
