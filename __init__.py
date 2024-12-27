@@ -61,6 +61,7 @@ class Window(QtWidgets.QDialog):
 
         self.browseInputButton.clicked.connect(self.browse_input_directory)
         self.browseOutputButton.clicked.connect(self.browse_output_directory)
+        self.chooseButton.clicked.connect(self.choose_processor)
 
         self.update_preview()
 
@@ -112,6 +113,16 @@ class Window(QtWidgets.QDialog):
             pattern = pattern.replace(k, v)
         preview_text = f"Preview: {pattern}_0"
         self.previewLabel.setText(preview_text)
+
+    def choose_processor(self):
+        selected_nodes = self.ui_mgr.getCurrentGraphSelectedNodes()
+        if selected_nodes.getSize() <= 0: return
+
+        self.processor_node = selected_nodes.getItem(0)
+        if self.processor_node is not None:
+            processor_label = self.processor_node.getDefinition().getLabel()
+            processor_id = self.processor_node.getIdentifier()
+            self.processorNameLineEdit.setText(processor_label + "_" + processor_id)
 
 ui_file = Path(__file__).resolve().parent / "batch_process_dialog.ui"
 
