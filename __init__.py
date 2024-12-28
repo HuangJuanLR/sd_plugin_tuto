@@ -1,11 +1,42 @@
 import os
 import sd
 from pathlib import Path
+from glob import glob
+from shutil import copy2
 from PySide6 import QtCore, QtWidgets, QtGui, QtUiTools
 from sd.api.sdproperty import SDPropertyCategory
 from sd.api.sdbasetypes import float2, float4
 from sd.api.sdvaluefloat import SDValueFloat
 from sd.api.sdvaluefloat4 import SDValueFloat4
+from sd.api.sdresourcefolder import SDResourceFolder
+from sd.api.sdtypetexture import SDTypeTexture
+from sd.api.sdvaluebool import SDValueBool
+from sd.api.sdresourcebitmap import SDResourceBitmap
+from sd.api.sdresource import EmbedMethod
+from sd.api.sdvaluestring import SDValueString
+from sd.tools.export import exportSDGraphOutputs
+
+color_io = (
+    "normal",
+    "position",
+    "worldnormal",
+    "mads",
+    "n",
+    "bc",
+    "basecolor",
+    "albedo"
+)
+grayscale_io = (
+    "ao",
+    "curvature",
+    "thickness",
+    "metalness",
+    "metallic",
+    "roughness",
+    "smoothness",
+    "height",
+    "ambientocclusion"
+)
 
 # from lib import Window
 
@@ -62,6 +93,7 @@ class Window(QtWidgets.QDialog):
         self.browseInputButton.clicked.connect(self.browse_input_directory)
         self.browseOutputButton.clicked.connect(self.browse_output_directory)
         self.chooseButton.clicked.connect(self.choose_processor)
+        self.processButton.clicked.connect(self.process_loop)
 
         self.update_preview()
 
@@ -123,6 +155,166 @@ class Window(QtWidgets.QDialog):
             processor_label = self.processor_node.getDefinition().getLabel()
             processor_id = self.processor_node.getIdentifier()
             self.processorNameLineEdit.setText(processor_label + "_" + processor_id)
+
+    def fetch_baked_textures(self):
+        textures = list(Path(self.input_directory).glob('**/*.exr'))
+        return textures
+
+    def process_loop(self):
+        self.process(1)
+
+
+    def process(self, index):
+        if self.graph is None or self.processor_node is None: return
+
+        output_nodes = []
+
+        processor_node_properties = self.processor_node.getProperties(SDPropertyCategory.Input)
+        processor_node_output = self.processor_node.getProperties(SDPropertyCategory.Output)
+        processor_pos = self.processor_node.getPosition()
+
+        # get/create resources folder
+        resource_folder = None
+        pkg = self.ui_mgr.getCurrentGraph().getPackage()
+        all_resource = self.ui_mgr.getCurrentGraph().getPackage().getChildrenResources(True)
+        for res in all_resource:
+            if isinstance(res, SDResourceFolder) and res.getIdentifier() == self.resource_folder_name:
+                resource_folder = res
+        if resource_folder is None:
+
+            resource_folder = SDResourceFolder.sNew(pkg)
+            resource_folder.setIdentifier(self.resource_folder_name)
+
+        # delete all previous loaded bitmap resources if any
+        # delete any bitmap node link to these resources
+        # pass False as not recursive to get only direct children
+        all_nodes = self.graph.getNodes()
+        loaded_resources = resource_folder.getChildren(False)
+        loaded_resources_path = []
+        for res in loaded_resources:
+            loaded_resources_path.append(res.getUrl())
+
+        for node in all_nodes:
+            if node.getDefinition().getId() == "sbs::compositing::bitmap":
+                pkg_resource_path = node.getPropertyValueFromId("bitmapresourcepath",
+                                                                SDPropertyCategory.Input).get()
+                if pkg_resource_path in loaded_resources_path:
+                    self.graph.deleteNode(node)
+
+        # loop again maybe not the right approach
+        # just for avoiding logging resource lost warning
+        for res in loaded_resources:
+            print(f"Deleting: {res.getIdentifier()}")
+            res.delete()
+
+        # loop and count, prop_count is for layout of input bitmap nodes
+        prop_count = 0
+        for prop in processor_node_properties:
+            prop_id = prop.getId()
+            if not prop_id.startswith("$") and isinstance(prop.getType(), SDTypeTexture):
+                prop_count = prop_count + 1
+
+        # loop through processor node's input port
+        prop_index = 0
+        for prop in processor_node_properties:
+            prop_id = prop.getId().lower()
+            # if prop.isConnectable():
+            if isinstance(prop.getType(), SDTypeTexture):
+                # create new bitmap nodes and store
+                input_bitmap_node = self.graph.newNode("sbs::compositing::bitmap")
+                # setting bitmap node position
+                pos_y = processor_pos.y - ((prop_count - 1) * 150) / 2 + prop_index * 150
+                input_bitmap_node.setPosition(float2(processor_pos.x - 200, pos_y))
+                # setting color mode based on processor's prop id
+                color_mode_prop = input_bitmap_node.getPropertyFromId('colorswitch', SDPropertyCategory.Input)
+                if prop_id in color_io:
+                    input_bitmap_node.setPropertyValue(color_mode_prop, SDValueBool.sNew(True))
+                elif prop_id in grayscale_io:
+                    input_bitmap_node.setPropertyValue(color_mode_prop, SDValueBool.sNew(False))
+
+                # load bitmap resources from selected directory
+                textures = self.fetch_baked_textures()
+                for tex in textures:
+                    # get texture's name and index
+                    tex_filename = Path(tex.name).stem
+                    tex_name = str.split(tex_filename, "_")[0]
+                    tex_index = int(str.split(tex_filename, "_")[1])
+                    # load texture as resource
+
+                    if tex_name == prop_id and tex_index == index:
+                        # tex_resource = pkg.findResourceFromUrl(str(tex))
+                        tex_resource = SDResourceBitmap.sNewFromFile(resource_folder, str(tex),
+                                                                     EmbedMethod.Linked)
+                        # set bitmap node PKG Resource Path
+                        bitmap_resource_property = input_bitmap_node.getPropertyFromId("bitmapresourcepath",
+                                                                                       SDPropertyCategory.Input)
+                        pkg_res_path = SDValueString.sNew(tex_resource.getUrl())
+                        input_bitmap_node.setPropertyValue(bitmap_resource_property, pkg_res_path)
+
+                # connect bitmap node to processor node
+                bitmap_output_prop = input_bitmap_node.getPropertyFromId("unique_filter_output",
+                                                                         SDPropertyCategory.Output)
+                input_bitmap_node.newPropertyConnection(bitmap_output_prop, self.processor_node, prop)
+
+                prop_index = prop_index + 1
+
+        output_count = processor_node_output.getSize()
+
+        output_index = 0
+        output_ids = []
+        for output in processor_node_output:
+            # delete previous output nodes with the same identifier
+            all_nodes = self.graph.getNodes()
+            for node in all_nodes:
+                if (node.getDefinition().getId() == "sbs::compositing::output" and
+                        node.getPropertyValueFromId("identifier",
+                                                    SDPropertyCategory.Annotation).get() == output.getId()):
+                    self.graph.deleteNode(node)
+
+            # create and store output node
+            output_node = self.graph.newNode("sbs::compositing::output")
+            output_nodes.append(output_node)
+            # set new output node's position
+            pos_y = processor_pos.y - ((output_count - 1) * 150) / 2 + output_index * 150
+            output_node.setPosition(float2(processor_pos.x + 200, pos_y))
+            # set output identifier
+            output_identifier = output_node.getPropertyFromId("identifier", SDPropertyCategory.Annotation)
+            output_node.setPropertyValue(output_identifier, SDValueString.sNew(output.getId()))
+            # connect processor node to output node
+            output_node_input = output_node.getPropertyFromId("inputNodeOutput", SDPropertyCategory.Input)
+            self.processor_node.newPropertyConnection(output, output_node, output_node_input)
+            # store output identifiers for later renaming files
+            output_ids.append(output.getId())
+
+            output_index = output_index + 1
+
+        if len(output_nodes) > 0:
+            for node in output_nodes:
+                self.graph.setOutputNode(node, True)
+
+            exportSDGraphOutputs(self.graph, self.output_directory, "png")
+
+            # map pattern to name
+            mapping = dict()
+            mapping['$(graph)'] = self.graph.getIdentifier()
+
+            # batch copy to new file and rename
+            # get latest output textures according to output number
+            tex_files = glob((os.path.join(self.output_directory, "*.png")))
+            tex_files.sort(key=os.path.getmtime, reverse=True)
+            latest_tex_files = tex_files[:output_index]
+            # rename latest created textures and save it as a copy
+            output_ids.reverse()
+            for i, tex in enumerate(latest_tex_files):
+                mapping['$(identifier)'] = output_ids[i]
+                pattern = self.pattern
+                for k, v in mapping.items():
+                    pattern = pattern.replace(k, v)
+                target_file = os.path.join(self.output_directory, f"{pattern}_{index}.png")
+                copy2(tex, target_file)
+                # then delete origin file
+                os.remove(tex)
+
 
 ui_file = Path(__file__).resolve().parent / "batch_process_dialog.ui"
 
