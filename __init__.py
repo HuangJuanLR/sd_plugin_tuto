@@ -161,7 +161,19 @@ class Window(QtWidgets.QDialog):
         return textures
 
     def process_loop(self):
-        self.process(1)
+        # self.process(1)
+        textures = self.fetch_baked_textures()
+        loop_indexes = []
+        for tex in textures:
+            # get texture's name and index
+            tex_filename = Path(tex.name).stem
+            tex_index = int(str.split(tex_filename, "_")[1])
+            if int(tex_index) not in loop_indexes:
+                loop_indexes.append(int(tex_index))
+
+        loop_indexes.sort()
+        for index in loop_indexes:
+            self.process(index)
 
 
     def process(self, index):
