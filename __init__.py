@@ -179,24 +179,36 @@ class Window(QtWidgets.QDialog):
     def process(self, index):
         if self.graph is None or self.processor_node is None: return
 
-        output_nodes = []
-
         processor_node_properties = self.processor_node.getProperties(SDPropertyCategory.Input)
         processor_node_output = self.processor_node.getProperties(SDPropertyCategory.Output)
         processor_pos = self.processor_node.getPosition()
 
+        pkg = self.ui_mgr.getCurrentGraph().getPackage()
+
+        resource_folder = self.get_resource_folder(pkg)
+
+        self.solve_previous_resources(resource_folder)
+
+        self.fetch_input(processor_node_properties, processor_pos, index, resource_folder)
+
+        self.generate_output(processor_node_output, processor_pos, index)
+
+
+    def get_resource_folder(self, pkg):
         # get/create resources folder
         resource_folder = None
-        pkg = self.ui_mgr.getCurrentGraph().getPackage()
+
         all_resource = self.ui_mgr.getCurrentGraph().getPackage().getChildrenResources(True)
         for res in all_resource:
             if isinstance(res, SDResourceFolder) and res.getIdentifier() == self.resource_folder_name:
                 resource_folder = res
         if resource_folder is None:
-
             resource_folder = SDResourceFolder.sNew(pkg)
             resource_folder.setIdentifier(self.resource_folder_name)
 
+        return resource_folder
+
+    def solve_previous_resources(self, resource_folder):
         # delete all previous loaded bitmap resources if any
         # delete any bitmap node link to these resources
         # pass False as not recursive to get only direct children
@@ -219,6 +231,7 @@ class Window(QtWidgets.QDialog):
             print(f"Deleting: {res.getIdentifier()}")
             res.delete()
 
+    def fetch_input(self, processor_node_properties, processor_pos, index, resource_folder):
         # loop and count, prop_count is for layout of input bitmap nodes
         prop_count = 0
         for prop in processor_node_properties:
@@ -270,8 +283,9 @@ class Window(QtWidgets.QDialog):
 
                 prop_index = prop_index + 1
 
+    def generate_output(self, processor_node_output, processor_pos, index):
         output_count = processor_node_output.getSize()
-
+        output_nodes = []
         output_index = 0
         output_ids = []
         for output in processor_node_output:
@@ -300,6 +314,9 @@ class Window(QtWidgets.QDialog):
 
             output_index = output_index + 1
 
+        self.rename_output_textures(output_nodes, output_index, output_ids, index)
+
+    def rename_output_textures(self, output_nodes, output_index, output_ids, index):
         if len(output_nodes) > 0:
             for node in output_nodes:
                 self.graph.setOutputNode(node, True)
@@ -326,7 +343,6 @@ class Window(QtWidgets.QDialog):
                 copy2(tex, target_file)
                 # then delete origin file
                 os.remove(tex)
-
 
 ui_file = Path(__file__).resolve().parent / "batch_process_dialog.ui"
 
