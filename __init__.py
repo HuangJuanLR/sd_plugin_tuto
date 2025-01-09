@@ -38,6 +38,14 @@ grayscale_io = (
     "height",
     "ambientocclusion"
 )
+io_format = [
+    "png",
+    "exr",
+    "tga",
+    "jpg",
+    "tif",
+    "jpeg"
+]
 
 ui_file = Path(__file__).resolve().parent / "batch_process_dialog.ui"
 
@@ -54,6 +62,8 @@ class Window(QtWidgets.QDialog):
         self.output_directory = None
         self.pattern = "$(graph)_$(identifier)"
         self.resource_folder_name = "BakedTexture"
+        self.inputFormat = "exr"
+        self.outputFormat = "png"
 
         self.ui_file = QtCore.QFile(ui_file)
         self.ui_file.open(QtCore.QFile.ReadOnly)
@@ -82,6 +92,9 @@ class Window(QtWidgets.QDialog):
         self.previewLabel = self.window.findChild(
             QtWidgets.QLabel, "previewLabel")
 
+        self.inputFormatComboBox = self.window.findChild(QtWidgets.QComboBox, "inputFormatComboBox")
+        self.outputFormatComboBox = self.window.findChild(QtWidgets.QComboBox, "outputFormatComboBox")
+
         self.browseInputButton = self.window.findChild(
             QtWidgets.QPushButton, "browseInputButton")
         self.browseOutputButton = self.window.findChild(
@@ -91,10 +104,18 @@ class Window(QtWidgets.QDialog):
         self.processButton = self.window.findChild(
             QtWidgets.QPushButton, "processButton")
 
+        # add item to combo box
+        self.inputFormatComboBox.addItems(io_format)
+        self.outputFormatComboBox.addItems(io_format)
+
         self.resourceFolderLineEdit.setText(self.resource_folder_name)
         self.inputDirectoryLineEdit.setText(self.input_directory)
         self.outputDirectoryLineEdit.setText(self.output_directory)
         self.patternLineEdit.setText(self.pattern)
+
+        # set comboBox initial item
+        self.inputFormatComboBox.setCurrentText(self.inputFormat)
+        self.outputFormatComboBox.setCurrentText(self.outputFormat)
 
         self.patternLineEdit.textChanged.connect(self.on_pattern_changed)
         self.resourceFolderLineEdit.editingFinished.connect(self.on_resource_folder_changed)
@@ -106,10 +127,19 @@ class Window(QtWidgets.QDialog):
         self.chooseButton.clicked.connect(self.choose_processor)
         self.processButton.clicked.connect(self.process_loop)
 
+        self.inputFormatComboBox.activated.connect(self.on_input_format_changed)
+        self.outputFormatComboBox.activated.connect(self.on_output_format_changed)
+
         self.update_preview()
 
     def show(self):
         self.window.show()
+
+    def on_input_format_changed(self):
+        self.inputFormat = self.inputFormatComboBox.currentText()
+
+    def on_output_format_changed(self):
+        self.outputFormat = self.outputFormatComboBox.currentText()
 
     def on_input_directory_manual(self):
         self.input_directory = self.inputDirectoryLineEdit.text()
@@ -173,7 +203,7 @@ class Window(QtWidgets.QDialog):
             self.processNameLineEdit.setText(processor_label + "_" + processor_id)
 
     def fetch_baked_textures(self):
-        textures = list(Path(self.input_directory).glob('**/*.exr'))
+        textures = list(Path(self.input_directory).glob(f'**/*.{self.inputFormat}'))
         return textures
 
     def process_loop(self):
@@ -316,13 +346,13 @@ class Window(QtWidgets.QDialog):
             for node in output_nodes:
                 self.graph.setOutputNode(node, True)
 
-            exportSDGraphOutputs(self.graph, self.output_directory, "png")
+            exportSDGraphOutputs(self.graph, self.output_directory, f"{self.outputFormat}")
 
             # map pattern to name
             mapping = dict()
             mapping['$(graph)'] = self.graph.getIdentifier()
 
-            tex_files = glob(os.path.join(self.output_directory, "*.png"))
+            tex_files = glob(os.path.join(self.output_directory, f"*.{self.outputFormat}"))
             tex_files.sort(key=os.path.getmtime, reverse=True)
             latest_text_files = tex_files[:output_index]
             output_ids.reverse()
@@ -331,7 +361,7 @@ class Window(QtWidgets.QDialog):
                 pattern = self.pattern
                 for k, v in mapping.items():
                     pattern = pattern.replace(k, v)
-                target_file = os.path.join(self.output_directory, f"{pattern}_{index}.png")
+                target_file = os.path.join(self.output_directory, f"{pattern}_{index}.{self.outputFormat}")
                 copy2(tex, target_file)
                 os.remove(tex)
 
