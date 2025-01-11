@@ -374,16 +374,12 @@ ui_mgr = app.getQtForPythonUIMgr()
 # get loaded packages
 all_pkgs = pkg_mgr.getPackages()
 
-graph = ui_mgr.getCurrentGraph()
-
 main_window = ui_mgr.getMainWindow()
-
-win = Window(ui_file, main_window, pkg_mgr, ui_mgr)
 
 menu_id = "HuangJuanLr" + "#BatchProcess"
 
 def show_plugin():
-    # print("test action")
+    win = Window(ui_file, main_window, pkg_mgr, ui_mgr)
     win.show()
 
 menu_bar = main_window.menuBar()
