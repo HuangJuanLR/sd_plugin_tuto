@@ -6,6 +6,9 @@
 
 Please follow the instruction below to use the plugin
 
+### Only rule to follow
+![rules](tutorial/rules.png)
+
 ### Install Plugin
 1.Download the latest package from release
 ![install](tutorial/install.png)
